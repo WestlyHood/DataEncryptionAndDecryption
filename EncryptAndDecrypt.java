@@ -1,115 +1,208 @@
+import javax.crypto.*;
+import javax.crypto.spec.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.*;
-import javax.crypto.*;
-import javax.crypto.spec.*;
 import java.util.Base64;
 
 public class DataEncryptAndDecrypt extends JFrame {
-  private JTextArea inputTextArea, outputTextArea;
-  private JButton encryptButton, decryptButton;
-  private KeyPair rsaKeyPair;
-  private SecretKey aesKey;
-  private byte[] encryptedData;
-  private byte[] encryptedAesKey;
+    private JTextArea inputTextArea, outputTextArea;
+    private JButton encryptTextButton, encryptFileButton, decryptTextButton, decryptFileButton;
+    private KeyPair rsaKeyPair;
+    private SecretKey aesKey;
+    private byte[] encryptedData;
+    private byte[] encryptedAesKey;
+    private byte[] decryptedAesKey;
+    private byte[] iv;
 
-  public DataEncryptAndDecrypt() {
-    setTitle("Encryption/Decryption Tool");
-    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-    setSize(400, 300);
-    setLocationRelativeTo(null);
+    public DataEncryptAndDecrypt() {
+        setTitle("Encryption/Decryption Tool");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(400, 300);
+        setLocationRelativeTo(null);
 
-    // Initialize GUI components
-    inputTextArea = new JTextArea(5, 30);
-    outputTextArea = new JTextArea(5, 30);
-    encryptButton = new JButton("Encrypt");
-    decryptButton = new JButton("Decrypt");
+        inputTextArea = new JTextArea(5, 30);
+        outputTextArea = new JTextArea(5, 30);
+        encryptTextButton = new JButton("Encrypt Text");
+        encryptFileButton = new JButton("Encrypt File");
+        decryptTextButton = new JButton("Decrypt Text");
+        decryptFileButton = new JButton("Decrypt File");
 
-    // Layout components
-    JPanel panel = new JPanel();
-    panel.setLayout(new GridLayout(4, 2));
-    panel.add(new JLabel("Enter Text:"));
-    panel.add(new JLabel("Result:"));
-    panel.add(new JScrollPane(inputTextArea));
-    panel.add(new JScrollPane(outputTextArea));
-    panel.add(encryptButton);
-    panel.add(decryptButton);
+        JPanel panel = new JPanel();
+        panel.setLayout(new GridLayout(5, 2));
+        panel.add(new JLabel("Enter Text/File:"));
+        panel.add(new JLabel("Result:"));
+        panel.add(new JScrollPane(inputTextArea));
+        panel.add(new JScrollPane(outputTextArea));
+        panel.add(encryptTextButton);
+        panel.add(encryptFileButton);
+        panel.add(decryptTextButton);
+        panel.add(decryptFileButton);
 
-    // Add action listeners
-    encryptButton.addActionListener(new ActionListener() {
-      public void actionPerformed(ActionEvent e) {
-        // Step 1: Generate RSA Key Pair
-        generateKeys();
+        encryptTextButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                encryptText();
+            }
+        });
 
-        // Step 2: Encrypt data using AES
-        encryptData();
-      }
-    });
+        encryptFileButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Choose a file for encryption");
+                int result = fileChooser.showOpenDialog(DataEncryptAndDecrypt.this);
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File selectedFile = fileChooser.getSelectedFile();
+                    encryptFile(selectedFile);
+                }
+            }
+        });
 
-    decryptButton.addActionListener(new ActionListener() {
-      public void actionPerformed(ActionEvent e) {
-        // Step 4: Decrypt AES key using RSA
-        decryptAesKey();
+        decryptTextButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                decryptText();
+            }
+        });
 
-        // Step 5: Decrypt AES Data
-        decryptData();
-      }
-    });
+        decryptFileButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Choose a file for decryption");
+                int result = fileChooser.showOpenDialog(DataEncryptAndDecrypt.this);
+                if (result == JFileChooser.APPROVE_OPTION) {
+                    File selectedFile = fileChooser.getSelectedFile();
+                    decryptFile(selectedFile);
+                }
+            }
+        });
 
-    // Set up the layout
-    setLayout(new BorderLayout());
-    add(panel, BorderLayout.CENTER);
+        setLayout(new BorderLayout());
+        add(panel, BorderLayout.CENTER);
 
-    setVisible(true);
-  }
+        setVisible(true);
+    }
 
-  public void generateKeys() {
-    try {
-      // Generate RSA Key Pair
-      KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
-      keyGen.initialize(2048);
-      rsaKeyPair = keyGen.generateKeyPair();
+    public void generateKeys() {
+        try {
+            KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
+            keyGen.initialize(2048);
+            rsaKeyPair = keyGen.generateKeyPair();
 
-      // Generate AES Key
-      KeyGenerator aesKeyGen = KeyGenerator.getInstance("AES");
-      aesKeyGen.init(256); // You can adjust the key size as needed
-      aesKey = aesKeyGen.generateKey();
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
+            KeyGenerator aesKeyGen = KeyGenerator.getInstance("AES");
+            aesKeyGen.init(256);
+            aesKey = aesKeyGen.generateKey();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
-  public void encryptData() {
-    try {
-      // Step 2: Encrypt data using AES
-      // Get the input data
-      String inputData = inputTextArea.getText();
+    public void encryptText() {
+        try {
+            generateKeys();
 
-      // Initialize the cipher
-      Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-      aesCipher.init(Cipher.ENCRYPT_MODE, aesKey);
+            SecureRandom random = new SecureRandom();
+            iv = new byte[16];
+            random.nextBytes(iv);
 
-      // Encrypt the data
-      encryptedData = aesCipher.doFinal(inputData.getBytes());
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
 
-      // Step 3: Encrypt AES key using RSA
-      Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-      rsaCipher.init(Cipher.ENCRYPT_MODE, rsaKeyPair.getPublic());
-      encryptedAesKey = rsaCipher.doFinal(aesKey.getEncoded());
+            String inputData = inputTextArea.getText();
+            encryptedData = aesCipher.doFinal(inputData.getBytes(StandardCharsets.UTF_8));
 
-      // Display the encrypted data and encrypted AES key
-      outputTextArea.setText("Encrypted Data:\n" + Base64.getEncoder().encodeToString(encryptedData) +
-          "\n\nEncrypted AES Key:\n" + Base64.getEncoder().encodeToString(encryptedAesKey));
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-  }
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.ENCRYPT_MODE, rsaKeyPair.getPublic());
+            encryptedAesKey = rsaCipher.doFinal(aesKey.getEncoded());
 
-  public void decryptAesKey() {
-    try {
-      // Step 4: Decrypt AES key using RSA
-      Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-      rsaCipher.init(Cipher.DECRYPT_MODE, rsaKeyPair.getPrivate());
-      byte[] decryptedAesKeyBytes = rsaCipher.doFinal(encryptedAesKey);
-      aesKey = new SecretKeySpec(decryptedAes
+            outputTextArea.setText("Encrypted Text:\n" + Base64.getEncoder().encodeToString(encryptedData) +
+                    "\n\nEncrypted AES Key:\n" + Base64.getEncoder().encodeToString(encryptedAesKey) +
+                    "\n\nInitialization Vector (IV):\n" + Base64.getEncoder().encodeToString(iv));
+        } catch (Exception e) {
+            e.printStackTrace();
+            outputTextArea.setText("Error during text encryption: " + e.getMessage());
+        }
+    }
+
+    public void encryptFile(File inputFile) {
+        try {
+            generateKeys();
+
+            SecureRandom random = new SecureRandom();
+            iv = new byte[16];
+            random.nextBytes(iv);
+
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, new IvParameterSpec(iv));
+
+            File outputFile = new File(inputFile.getParent(), "encrypted_" + inputFile.getName());
+
+            // Encrypt file
+            CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
+            Files.copy(cis, outputFile.toPath());
+            cis.close();
+
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.ENCRYPT_MODE, rsaKeyPair.getPublic());
+            encryptedAesKey = rsaCipher.doFinal(aesKey.getEncoded());
+
+            outputTextArea.setText("File Encrypted Successfully:\n" +
+                    "Encrypted AES Key: " + Base64.getEncoder().encodeToString(encryptedAesKey) +
+                    "\nInitialization Vector (IV): " + Base64.getEncoder().encodeToString(iv));
+        } catch (Exception e) {
+            e.printStackTrace();
+            outputTextArea.setText("Error during file encryption: " + e.getMessage());
+        }
+    }
+
+    public void decryptText() {
+        try {
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, rsaKeyPair.getPrivate());
+            decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
+
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(decryptedAesKey, "AES"), new IvParameterSpec(iv));
+
+            byte[] decryptedBytes = aesCipher.doFinal(encryptedData);
+
+            outputTextArea.setText("Decrypted Text:\n" + new String(decryptedBytes, StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            e.printStackTrace();
+            outputTextArea.setText("Error during text decryption: " + e.getMessage());
+        }
+    }
+
+    public void decryptFile(File inputFile) {
+        try {
+            Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            rsaCipher.init(Cipher.DECRYPT_MODE, rsaKeyPair.getPrivate());
+            decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
+
+            Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            aesCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(decryptedAesKey, "AES"), new IvParameterSpec(iv));
+
+            File outputFile = new File(inputFile.getParent(), "decrypted_" + inputFile.getName());
+
+            // Decrypt file
+            CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
+            Files.copy(cis, outputFile.toPath());
+            cis.close();
+
+            outputTextArea.setText("File Decrypted Successfully");
+        } catch (Exception e) {
+            e.printStackTrace();
+            outputTextArea.setText("Error during file decryption: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                new DataEncryptAndDecrypt();
+            }
+        });
+    }
+}
