@@ -1,46 +1,17 @@
-Data Encryption and Decryption Tool
-This is a simple tool for encrypting and decrypting data using RSA and AES encryption algorithms.
+The Data Encryption and Decryption Tool is a Java application designed for secure text and file encryption using a combination of RSA and AES algorithms. This user-friendly tool provides a graphical user interface (GUI) built with Swing, making it accessible to users without extensive technical knowledge.
 
-# Data Encryption and Decryption Tool
+Features
+Text Encryption and Decryption: Easily encrypt and decrypt text messages securely.
+File Encryption and Decryption: Encrypt and decrypt files using robust RSA and AES algorithms.
+Simple and Intuitive Interface: The GUI simplifies the encryption and decryption process, making it user-friendly.
+Getting Started
+To use the tool, ensure you have the Java Development Kit (JDK) installed on your system. Clone the repository, compile the Java code, and create an executable JAR file. The tool supports both text and file encryption, providing a versatile solution for securing sensitive information.
 
-A simple Java application for encrypting and decrypting text and files using a combination of RSA and AES algorithms.
-
-## Table of Contents
-
-- [Features](#features)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Usage](#usage)
-  - [Encrypt Text](#encrypt-text)
-  - [Decrypt Text](#decrypt-text)
-  - [Encrypt File](#encrypt-file)
-  - [Decrypt File](#decrypt-file)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Features
-
-- Encrypt and decrypt text messages.
-- Encrypt and decrypt files securely using RSA and AES algorithms.
-- User-friendly graphical user interface (GUI) built with Swing.
-
-## Getting Started
-
-### Prerequisites
-
-- Java Development Kit (JDK) installed on your system.
-
-### Installation
-
-1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/WestlyHood/DataEncryptAndDecrypt.git
-
+Usage
+Run the application using the JAR file and utilize the straightforward GUI to perform various encryption and decryption tasks. Encrypt text, decrypt text, encrypt files, and decrypt files seamlessly with just a few clicks.
 
 Contributing
-If you have any suggestions or bug reports, please feel free to open a new issue on GitHub.
+Contributions to the project are welcome! Please refer to the Contribution Guidelines for details on how to contribute.
 
 License
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the LICENSE file for details.
