@@ -36,7 +36,7 @@ A simple Java application for encrypting and decrypting text and files using a c
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/your-username/DataEncryptAndDecrypt.git
+   git clone https://github.com/WestlyHood/DataEncryptAndDecrypt.git
 
 
 Contributing
