@@ -16,13 +16,12 @@ public class DataEncryptAndDecrypt extends JFrame {
     private SecretKey aesKey;
     private byte[] encryptedData;
     private byte[] encryptedAesKey;
-    private byte[] decryptedAesKey;
     private byte[] iv;
 
     public DataEncryptAndDecrypt() {
         setTitle("Encryption/Decryption Tool");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(400, 300);
+        setSize(600, 400);
         setLocationRelativeTo(null);
 
         inputTextArea = new JTextArea(5, 30);
@@ -32,10 +31,9 @@ public class DataEncryptAndDecrypt extends JFrame {
         decryptTextButton = new JButton("Decrypt Text");
         decryptFileButton = new JButton("Decrypt File");
 
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(5, 2));
-        panel.add(new JLabel("Enter Text/File:"));
-        panel.add(new JLabel("Result:"));
+        JPanel panel = new JPanel(new GridLayout(5, 2, 10, 10));
+        panel.add(new JLabel("Input Text/File:"));
+        panel.add(new JLabel("Output:"));
         panel.add(new JScrollPane(inputTextArea));
         panel.add(new JScrollPane(outputTextArea));
         panel.add(encryptTextButton);
@@ -43,49 +41,18 @@ public class DataEncryptAndDecrypt extends JFrame {
         panel.add(decryptTextButton);
         panel.add(decryptFileButton);
 
-        encryptTextButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                encryptText();
-            }
-        });
-
-        encryptFileButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setDialogTitle("Choose a file for encryption");
-                int result = fileChooser.showOpenDialog(DataEncryptAndDecrypt.this);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    encryptFile(selectedFile);
-                }
-            }
-        });
-
-        decryptTextButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                decryptText();
-            }
-        });
-
-        decryptFileButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser();
-                fileChooser.setDialogTitle("Choose a file for decryption");
-                int result = fileChooser.showOpenDialog(DataEncryptAndDecrypt.this);
-                if (result == JFileChooser.APPROVE_OPTION) {
-                    File selectedFile = fileChooser.getSelectedFile();
-                    decryptFile(selectedFile);
-                }
-            }
-        });
-
         setLayout(new BorderLayout());
         add(panel, BorderLayout.CENTER);
+
+        encryptTextButton.addActionListener(e -> encryptText());
+        encryptFileButton.addActionListener(e -> chooseFileForEncryption());
+        decryptTextButton.addActionListener(e -> decryptText());
+        decryptFileButton.addActionListener(e -> chooseFileForDecryption());
 
         setVisible(true);
     }
 
-    public void generateKeys() {
+    private void generateKeys() {
         try {
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
             keyGen.initialize(2048);
@@ -95,11 +62,11 @@ public class DataEncryptAndDecrypt extends JFrame {
             aesKeyGen.init(256);
             aesKey = aesKeyGen.generateKey();
         } catch (Exception e) {
-            e.printStackTrace();
+            showError("Error generating keys: " + e.getMessage());
         }
     }
 
-    public void encryptText() {
+    private void encryptText() {
         try {
             generateKeys();
 
@@ -121,12 +88,19 @@ public class DataEncryptAndDecrypt extends JFrame {
                     "\n\nEncrypted AES Key:\n" + Base64.getEncoder().encodeToString(encryptedAesKey) +
                     "\n\nInitialization Vector (IV):\n" + Base64.getEncoder().encodeToString(iv));
         } catch (Exception e) {
-            e.printStackTrace();
-            outputTextArea.setText("Error during text encryption: " + e.getMessage());
+            showError("Error during text encryption: " + e.getMessage());
         }
     }
 
-    public void encryptFile(File inputFile) {
+    private void chooseFileForEncryption() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Choose a file for encryption");
+        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            encryptFile(fileChooser.getSelectedFile());
+        }
+    }
+
+    private void encryptFile(File inputFile) {
         try {
             generateKeys();
 
@@ -139,29 +113,32 @@ public class DataEncryptAndDecrypt extends JFrame {
 
             File outputFile = new File(inputFile.getParent(), "encrypted_" + inputFile.getName());
 
-            // Encrypt file
-            CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
-            Files.copy(cis, outputFile.toPath());
-            cis.close();
+            try (CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
+                 FileOutputStream fos = new FileOutputStream(outputFile)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = cis.read(buffer)) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                }
+            }
 
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.ENCRYPT_MODE, rsaKeyPair.getPublic());
             encryptedAesKey = rsaCipher.doFinal(aesKey.getEncoded());
 
-            outputTextArea.setText("File Encrypted Successfully:\n" +
-                    "Encrypted AES Key: " + Base64.getEncoder().encodeToString(encryptedAesKey) +
-                    "\nInitialization Vector (IV): " + Base64.getEncoder().encodeToString(iv));
+            outputTextArea.setText("File Encrypted Successfully.\nEncrypted AES Key:\n" +
+                    Base64.getEncoder().encodeToString(encryptedAesKey) +
+                    "\nInitialization Vector (IV):\n" + Base64.getEncoder().encodeToString(iv));
         } catch (Exception e) {
-            e.printStackTrace();
-            outputTextArea.setText("Error during file encryption: " + e.getMessage());
+            showError("Error during file encryption: " + e.getMessage());
         }
     }
 
-    public void decryptText() {
+    private void decryptText() {
         try {
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, rsaKeyPair.getPrivate());
-            decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
+            byte[] decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
 
             Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             aesCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(decryptedAesKey, "AES"), new IvParameterSpec(iv));
@@ -170,39 +147,49 @@ public class DataEncryptAndDecrypt extends JFrame {
 
             outputTextArea.setText("Decrypted Text:\n" + new String(decryptedBytes, StandardCharsets.UTF_8));
         } catch (Exception e) {
-            e.printStackTrace();
-            outputTextArea.setText("Error during text decryption: " + e.getMessage());
+            showError("Error during text decryption: " + e.getMessage());
         }
     }
 
-    public void decryptFile(File inputFile) {
+    private void chooseFileForDecryption() {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Choose a file for decryption");
+        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            decryptFile(fileChooser.getSelectedFile());
+        }
+    }
+
+    private void decryptFile(File inputFile) {
         try {
             Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
             rsaCipher.init(Cipher.DECRYPT_MODE, rsaKeyPair.getPrivate());
-            decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
+            byte[] decryptedAesKey = rsaCipher.doFinal(encryptedAesKey);
 
             Cipher aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
             aesCipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(decryptedAesKey, "AES"), new IvParameterSpec(iv));
 
             File outputFile = new File(inputFile.getParent(), "decrypted_" + inputFile.getName());
 
-            // Decrypt file
-            CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
-            Files.copy(cis, outputFile.toPath());
-            cis.close();
+            try (CipherInputStream cis = new CipherInputStream(new FileInputStream(inputFile), aesCipher);
+                 FileOutputStream fos = new FileOutputStream(outputFile)) {
+                byte[] buffer = new byte[1024];
+                int bytesRead;
+                while ((bytesRead = cis.read(buffer)) != -1) {
+                    fos.write(buffer, 0, bytesRead);
+                }
+            }
 
-            outputTextArea.setText("File Decrypted Successfully");
+            outputTextArea.setText("File Decrypted Successfully.");
         } catch (Exception e) {
-            e.printStackTrace();
-            outputTextArea.setText("Error during file decryption: " + e.getMessage());
+            showError("Error during file decryption: " + e.getMessage());
         }
     }
 
+    private void showError(String message) {
+        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                new DataEncryptAndDecrypt();
-            }
-        });
+        SwingUtilities.invokeLater(DataEncryptAndDecrypt::new);
     }
 }
